@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Manager - API Version</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1><i class="fas fa-tasks"></i> Task Manager</h1>
+            <p>Stay organized and productive - API Version</p>
+            <div class="api-status">
+                <span id="apiStatus" class="status-indicator">
+                    <i class="fas fa-circle"></i> Checking API...
+                </span>
+            </div>
+        </header>
+
+        <div class="task-input-section">
+            <form id="taskForm" class="task-form">
+                <div class="input-group">
+                    <input type="text" id="taskInput" placeholder="Add a new task..." required>
+                    <input type="datetime-local" id="deadlineInput">
+                    <button type="submit" class="add-btn">
+                        <i class="fas fa-plus"></i> Add Task
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="filter-section">
+            <div class="filter-buttons">
+                <button class="filter-btn active" data-filter="all">All Tasks</button>
+                <button class="filter-btn" data-filter="pending">Pending</button>
+                <button class="filter-btn" data-filter="completed">Completed</button>
+            </div>
+            <div class="task-stats">
+                <span id="taskCount">0 tasks</span>
+            </div>
+        </div>
+
+        <div class="tasks-section">
+            <div id="tasksList" class="tasks-list">
+                <!-- Tasks will be dynamically added here -->
+            </div>
+            <div id="emptyState" class="empty-state">
+                <i class="fas fa-clipboard-list"></i>
+                <h3>No tasks yet</h3>
+                <p>Add your first task to get started!</p>
+            </div>
+        </div>
+
+        <div class="api-controls">
+            <button id="refreshBtn" class="api-btn">
+                <i class="fas fa-sync-alt"></i> Refresh
+            </button>
+            <button id="clearAllBtn" class="api-btn danger">
+                <i class="fas fa-trash"></i> Clear All
+            </button>
+        </div>
+    </div>
+
+    <script src="api-client.js"></script>
+    <script>
+        // Add API status indicator styles
+        const style = document.createElement('style');
+        style.textContent = `
+            .api-status {
+                margin-top: 10px;
+            }
+            .status-indicator {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                padding: 8px 16px;
+                background: rgba(255,255,255,0.1);
+                border-radius: 20px;
+                font-size: 14px;
+                backdrop-filter: blur(10px);
+            }
+            .status-indicator.connected {
+                color: #28a745;
+            }
+            .status-indicator.disconnected {
+                color: #dc3545;
+            }
+            .api-controls {
+                margin-top: 20px;
+                display: flex;
+                gap: 15px;
+                justify-content: center;
+                flex-wrap: wrap;
+            }
+            .api-btn {
+                padding: 12px 20px;
+                border: 2px solid rgba(255,255,255,0.3);
+                background: rgba(255,255,255,0.1);
+                color: white;
+                border-radius: 25px;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                font-weight: 500;
+                backdrop-filter: blur(10px);
+            }
+            .api-btn:hover {
+                background: rgba(255,255,255,0.2);
+                transform: translateY(-2px);
+            }
+            .api-btn.danger {
+                border-color: rgba(220, 53, 69, 0.5);
+                background: rgba(220, 53, 69, 0.1);
+            }
+            .api-btn.danger:hover {
+                background: rgba(220, 53, 69, 0.2);
+            }
+        `;
+        document.head.appendChild(style);
+
+        // Enhanced API status monitoring
+        document.addEventListener('DOMContentLoaded', () => {
+            const statusElement = document.getElementById('apiStatus');
+            const refreshBtn = document.getElementById('refreshBtn');
+            const clearAllBtn = document.getElementById('clearAllBtn');
+
+            // Update API status
+            const updateAPIStatus = (connected) => {
+                if (connected) {
+                    statusElement.innerHTML = '<i class="fas fa-circle"></i> API Connected';
+                    statusElement.className = 'status-indicator connected';
+                } else {
+                    statusElement.innerHTML = '<i class="fas fa-circle"></i> API Disconnected';
+                    statusElement.className = 'status-indicator disconnected';
+                }
+            };
+
+            // Check API status
+            const checkAPIStatus = async () => {
+                try {
+                    const response = await fetch('/api/stats');
+                    updateAPIStatus(response.ok);
+                } catch (error) {
+                    updateAPIStatus(false);
+                }
+            };
+
+            // Refresh tasks
+            refreshBtn.addEventListener('click', () => {
+                if (taskManager && taskManager.useAPI) {
+                    taskManager.loadTasksFromAPI();
+                } else {
+                    taskManager.renderTasks();
+                }
+            });
+
+            // Clear all tasks
+            clearAllBtn.addEventListener('click', () => {
+                if (confirm('Are you sure you want to delete ALL tasks? This action cannot be undone.')) {
+                    if (taskManager && taskManager.useAPI) {
+                        // Clear via API
+                        taskManager.tasks.forEach(async (task) => {
+                            try {
+                                await taskManager.api.deleteTask(task.id);
+                            } catch (error) {
+                                console.error('Failed to delete task:', error);
+                            }
+                        });
+                        taskManager.tasks = [];
+                        taskManager.renderTasks();
+                        taskManager.updateTaskCount();
+                    } else {
+                        taskManager.clearAllTasks();
+                    }
+                }
+            });
+
+            // Check API status on load and periodically
+            checkAPIStatus();
+            setInterval(checkAPIStatus, 30000); // Check every 30 seconds
+        });
+    </script>
+</body>
+</html>
